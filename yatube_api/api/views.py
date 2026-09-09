@@ -1,18 +1,22 @@
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
-
+from rest_framework.permissions import (
+    IsAuthenticatedOrReadOnly,
+    IsAuthenticated)
 from django.shortcuts import get_object_or_404
 
-from posts.models import Post, Group, Comment, Follow
+from posts.models import Post, Group, Comment
 from .serializers import (
     PostSerializer, GroupSerializer, CommentSerializer, FollowSerializer
 )
+from .permissions import IsAuthorOrReadOnly
 
 
 class PostViewSet(viewsets.ModelViewSet):
     """Вьюсет для управления постами."""
     queryset = Post.objects.all()
     serializer_class = PostSerializer
+    permission_classes = (IsAuthorOrReadOnly, IsAuthenticatedOrReadOnly,)
 
     def perform_create(self, serializer):
         """Автоматически подставляем автора."""
@@ -28,6 +32,7 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     """Вьюсет для управления комментариями."""
     serializer_class = CommentSerializer
+    permission_classes = (IsAuthorOrReadOnly, IsAuthenticatedOrReadOnly,)
 
     def get_queryset(self):
         """Получаем комментарии только для конкретного поста."""
@@ -45,13 +50,13 @@ class CommentViewSet(viewsets.ModelViewSet):
 class FollowViewSet(viewsets.ModelViewSet):
     """Вьюсет для упрваления подписками."""
     serializer_class = FollowSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = (IsAuthenticated,)
     filter_backends = [filters.SearchFilter]
-    search_fields = ['following__username']
+    search_fields = ('following__username',)
 
     def get_queryset(self):
         """Возвращаем подписки только текущего пользователя."""
-        return Follow.objects.filter(user=self.request.user)
+        return self.request.user.follower.all()
 
     def perform_create(self, serializer):
         """Автоматически подставляем пользователя."""
