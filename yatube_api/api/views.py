@@ -1,4 +1,4 @@
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, permissions, mixins
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.permissions import (
     IsAuthenticatedOrReadOnly,
@@ -27,6 +27,7 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для управления сообществами."""
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
+    permission_classes = (permissions.AllowAny,)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -34,20 +35,23 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = (IsAuthorOrReadOnly, IsAuthenticatedOrReadOnly,)
 
+    def get_post(self):
+        """Получаем пост по id из URL."""
+        post_id = self.kwargs.get('post_id')
+        return get_object_or_404(Post, id=post_id)
+
     def get_queryset(self):
         """Получаем комментарии только для конкретного поста."""
-        post_id = self.kwargs.get('post_id')
-        post = get_object_or_404(Post, id=post_id)
-        return Comment.objects.filter(post=post)
+        return Comment.objects.filter(post=self.get_post())
 
     def perform_create(self, serializer):
         """Автоматически подставляем автора и пост."""
-        post_id = self.kwargs.get('post_id')
-        post = get_object_or_404(Post, id=post_id)
-        serializer.save(author=self.request.user, post=post)
+        serializer.save(author=self.request.user, post=self.get_post())
 
 
-class FollowViewSet(viewsets.ModelViewSet):
+class FollowViewSet(mixins.CreateModelMixin,
+                    mixins.ListModelMixin,
+                    viewsets.GenericViewSet):
     """Вьюсет для упрваления подписками."""
     serializer_class = FollowSerializer
     permission_classes = (IsAuthenticated,)
